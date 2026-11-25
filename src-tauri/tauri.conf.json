@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "iPhone Cast",
+  "version": "0.1.2",
+  "identifier": "local.chengjing.iphonecast",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{ "label": "main", "title": "澄镜 · iPhone Cast", "width": 1440, "height": 920, "minWidth": 800, "minHeight": 700, "center": true, "backgroundColor": "#101419" }],
+    "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost; font-src 'self'", "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost http://localhost:1420 http://127.0.0.1:1420 ws://localhost:1420 ws://127.0.0.1:1420; font-src 'self'" }
+  },
+  "bundle": {
+    "active": true,
+    "useLocalToolsDir": true,
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "targets": ["nsis"],
+    "resources": { "resources/runtime/": "runtime/", "../licenses/": "licenses/" },
+    "shortDescription": "iPhone 无线投屏与蓝牙鼠标控制",
+    "license": "GPL-3.0-or-later",
+    "windows": { "webviewInstallMode": { "type": "downloadBootstrapper" }, "nsis": { "displayLanguageSelector": false, "languages": ["SimpChinese", "English"] } }
+  }
+}

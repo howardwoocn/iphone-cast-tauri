@@ -1,0 +1,9 @@
+# A project-local mirror for reproducible access from this development environment.
+# Remove the source replacement to use crates.io directly on other networks.
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+[http]
+multiplexing = false
+timeout = 60

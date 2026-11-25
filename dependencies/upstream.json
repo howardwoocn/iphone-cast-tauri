@@ -1,0 +1,6 @@
+{
+  "uxplay": { "repository": "https://github.com/FDH2/UxPlay", "tag": "v1.73.6", "commit": "21eef8df25d91e12635c36d8176ad192725baca2", "license": "GPL-3.0-or-later", "patches": "scripts/patch-upstream.py" },
+  "json": { "url": "https://raw.githubusercontent.com/nlohmann/json/v3.11.3/single_include/nlohmann/json.hpp", "version": "3.11.3", "license": "MIT" },
+  "dnsSdHeader": { "url": "https://raw.githubusercontent.com/apple-oss-distributions/mDNSResponder/mDNSResponder-2200.140.11/mDNSShared/dns_sd.h", "version": "2200.140.11", "license": "BSD-3-Clause" },
+  "hidReference": { "repository": "https://github.com/xhoantran/iphone-use", "commit": "bc0fe36e78ec5a3af095c813574e3a8b7bbea4dd", "license": "MIT", "usage": "Protocol design reference; independently implemented in Rust for Windows." }
+}

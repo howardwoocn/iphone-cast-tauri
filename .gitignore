@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.tools/
+.cache/
+artifacts/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/resources/runtime/*
+!src-tauri/resources/runtime/.gitkeep
+vendor/UxPlay/.git/
+*.log
+*.tsbuildinfo
