@@ -79,7 +79,7 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
               {([{ action: 'previous', label: '上一首', Icon: SkipBack }, { action: 'toggle', label: toggleLabel, Icon: playing ? Pause : Play }, { action: 'next', label: '下一首', Icon: SkipForward }]).map(({ action, label, Icon }) => <button key={action} aria-label={label} title={label} className={`media-button ${action === 'toggle' ? 'media-toggle' : ''}`} disabled={!desktop || !connected || !cast.mediaReady || busy || volumeBusy} onClick={() => control(action)}><span className="media-glyph"><Icon size={27} strokeWidth={1.5} /></span></button>)}
             </div>
             <h2>{status.deviceName || '等待手机连接'}</h2>
-            <div className={`state-line ${connected ? 'is-live' : ''}`}><i />{connected ? '音频已连接' : labels[status.state]}</div>
+            <div className={`state-line ${connected ? 'is-live' : ''}`}><i />{connected ? '已连接' : status.state === 'disconnected' ? '已断开' : '未连接'}</div>
             <p>{busy ? '正在处理…' : notice || status.message}</p>
             {connected && !cast.mediaReady && <p className="media-hint">蓝牙媒体控制尚未连接</p>}
           </div>
@@ -92,7 +92,7 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
           <div className="card-heading speaker-heading"><h3>手机设备</h3><button className="refresh-button" disabled={!desktop || busy || volumeBusy} onClick={() => run(refresh)}><RefreshCw size={14} />刷新</button></div>
           <div className="card-body device-list">
             {devices.length === 0 && <p className="status-message">未发现手机，请先在 Windows 蓝牙设置中配对，然后刷新。</p>}
-            {devices.map(device => <div className="speaker-device" key={device.id}><Smartphone size={23} /><div><strong>{device.name || '蓝牙设备'}</strong><small>{connected && status.deviceId === device.id ? '已连接' : '已配对'}</small></div><button className="secondary-button" disabled={busy || volumeBusy || !desktop} onClick={() => connected && status.deviceId === device.id ? run(async () => setStatus(await command<SpeakerStatus>('disconnect_speaker'))) : connect(device)}>{connected && status.deviceId === device.id ? '断开连接' : '连接'}</button></div>)}
+            {devices.map(device => <div className="speaker-device" key={device.id}><Smartphone size={23} /><div><strong>{device.name || '蓝牙设备'}</strong><small>{connected && status.deviceId === device.id ? '已连接' : '已配对'}</small></div><button className="secondary-button" disabled={busy || volumeBusy || !desktop} onClick={() => connected && status.deviceId === device.id ? run(async () => setStatus(await command<SpeakerStatus>('disconnect_speaker'))) : connect(device)}>{connected && status.deviceId === device.id ? '断开' : '连接'}</button></div>)}
           </div>
         </section>
         <section className="inspector-card"><h3 className="card-heading">连接状态</h3><div className="card-body metrics">

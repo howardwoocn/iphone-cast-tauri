@@ -102,7 +102,7 @@ export default function App() {
             <div className="card-body">
               {status.receiver === 'streaming' && <div className="device-line"><Smartphone size={18} />iPhone</div>}
               <div className="info-row receiver-row"><span>接收名称</span><strong>{status.receiverName}</strong></div>
-              <button className="secondary-button" disabled={busy || status.receiver === 'starting'} onClick={() => run(() => active ? command('stop_receiver') : command('start_receiver', { name, testMode: false }))}>{active ? <Square size={15} /> : <Play size={15} />}{active ? '停止投屏' : '开始接收投屏'}</button>
+              <button className="secondary-button" disabled={busy || status.receiver === 'starting'} onClick={() => run(() => active ? command('stop_receiver') : command('start_receiver', { name, testMode: false }))}>{active ? <Square size={15} /> : <Play size={15} />}{active ? '停止接收投屏' : '开始接收投屏'}</button>
             </div>
           </section>
           <section className="inspector-card">
