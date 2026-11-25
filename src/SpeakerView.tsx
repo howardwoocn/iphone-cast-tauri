@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bluetooth, Play, Pause, RefreshCw, SkipBack, SkipForward, Volume2, VolumeX, X } from 'lucide-react';
 import { CastStatus, command, desktop, initialSpeakerStatus, SpeakerDevice, SpeakerStatus } from './bridge';
+import VolumeSlider from './VolumeSlider';
 
 const labels = { off: '未连接', connected: '已连接', disconnected: '已断开', error: '连接异常' };
 export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy: (busy: boolean) => void }) {
@@ -9,7 +10,6 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [connectingDevice, setConnectingDevice] = useState<string | null>(null);
-  const [volumeBusy, setVolumeBusy] = useState(false);
   const [volumeDraft, setVolumeDraft] = useState<number | null>(null);
   const volumeTimer = useRef<ReturnType<typeof setTimeout>>();
   const volumeSequence = useRef(0);
@@ -25,8 +25,11 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
   const shownVolume = volumeDraft ?? reportedVolume;
   const volumeAvailable = desktop && connected && cast.mediaReady && reportedVolume !== null;
   useEffect(() => {
-    if (!volumeBusy && reportedVolume !== null && reportedVolume > 0) previousVolume.current = reportedVolume;
-  }, [reportedVolume, volumeBusy]);
+    if (volumeDraft === null && reportedVolume !== null && reportedVolume > 0) previousVolume.current = reportedVolume;
+  }, [reportedVolume, volumeDraft]);
+  useEffect(() => {
+    clearTimeout(volumeTimer.current); volumeSequence.current++; setVolumeDraft(null);
+  }, [connected, cast.mediaReady, status.deviceId]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; clearTimeout(volumeTimer.current); clearTimeout(playbackTimer.current); volumeSequence.current++; playbackRequest.current++; };
@@ -34,12 +37,13 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
   const adjustVolume = (value: number) => {
     clearTimeout(volumeTimer.current);
     const sequence = ++volumeSequence.current;
-    setVolumeDraft(value); setVolumeBusy(true); onBusy(true); setError('');
+    if (value === 0 && shownVolume !== null && shownVolume > 0) previousVolume.current = shownVolume;
+    setVolumeDraft(value); setError('');
     volumeTimer.current = setTimeout(async () => {
       try { await command<number | null>('set_phone_volume', { volume: value }); }
-      catch (e) { if (sequence === volumeSequence.current) setError(String(e)); }
+      catch (e) { if (mounted.current && sequence === volumeSequence.current) setError(String(e)); }
       finally {
-        if (sequence === volumeSequence.current) { setVolumeDraft(null); setVolumeBusy(false); onBusy(false); }
+        if (mounted.current && sequence === volumeSequence.current) setVolumeDraft(null);
       }
     }, 140);
   };
@@ -130,7 +134,7 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
         <div className="speaker-stage">
           <div className="speaker-content">
             <div className="playback-controls" aria-label="手机播放控制">
-              {([{ action: 'previous', label: '上一首', Icon: SkipBack }, { action: 'toggle', label: toggleLabel, Icon: playing ? Pause : Play }, { action: 'next', label: '下一首', Icon: SkipForward }]).map(({ action, label, Icon }) => <button key={action} aria-label={label} title={label} className={`media-button ${action === 'toggle' ? 'media-toggle' : ''}`} disabled={!desktop || !connected || !cast.mediaReady || busy || volumeBusy} onClick={() => control(action)}><span className="media-glyph"><Icon size={27} strokeWidth={1.5} /></span></button>)}
+              {([{ action: 'previous', label: '上一首', Icon: SkipBack }, { action: 'toggle', label: toggleLabel, Icon: playing ? Pause : Play }, { action: 'next', label: '下一首', Icon: SkipForward }]).map(({ action, label, Icon }) => <button key={action} aria-label={label} title={label} className={`media-button ${action === 'toggle' ? 'media-toggle' : ''}`} disabled={!desktop || !connected || !cast.mediaReady || busy} onClick={() => control(action)}><span className="media-glyph"><Icon size={27} strokeWidth={1.5} /></span></button>)}
             </div>
             <h2>{status.deviceName || '等待手机连接'}</h2>
             <div className={`state-line ${connected ? 'is-live' : ''}`}><i />{connected ? '已连接' : status.state === 'disconnected' ? '已断开' : '未连接'}</div>
@@ -143,13 +147,13 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
       <aside className="details-panel">
           <div className="inspector-content">
         <section className="inspector-card">
-          <div className="card-heading speaker-heading"><h3>设备列表</h3><button className="refresh-button" disabled={!desktop || busy || volumeBusy} onClick={() => run(refresh)}><RefreshCw size={14} />刷新</button></div>
+          <div className="card-heading speaker-heading"><h3>设备列表</h3><button className="refresh-button" disabled={!desktop || busy} onClick={() => run(refresh)}><RefreshCw size={14} />刷新</button></div>
           <div className="card-body device-list">
             {devices.length === 0 && <p className="status-message">未发现手机，请先在 Windows 蓝牙设置中配对，然后刷新。</p>}
             {devices.map(device => {
               const selected = connected && status.deviceId === device.id;
               const name = device.name || '蓝牙设备';
-              return <button className={`speaker-device ${selected ? 'is-connected' : ''}`} key={device.id} aria-label={`${selected ? '断开' : '连接'} ${name}`} aria-pressed={selected} title={`${name} · 点击${selected ? '断开' : '连接'}`} disabled={busy || volumeBusy || !desktop} onClick={() => selected ? run(async () => setStatus(await command<SpeakerStatus>('disconnect_speaker'))) : connect(device)}>
+              return <button className={`speaker-device ${selected ? 'is-connected' : ''}`} key={device.id} aria-label={`${selected ? '断开' : '连接'} ${name}`} aria-pressed={selected} title={`${name} · 点击${selected ? '断开' : '连接'}`} disabled={busy || !desktop} onClick={() => selected ? run(async () => setStatus(await command<SpeakerStatus>('disconnect_speaker'))) : connect(device)}>
                 <span className="device-name">{name}</span>
                 <span className="device-connection-state">{connectingDevice === device.id ? '连接中' : selected ? '已连接' : '已配对'}</span>
               </button>;
@@ -157,16 +161,16 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
           </div>
         </section>
         <section className="inspector-card"><h3 className="card-heading">连接状态</h3><div className="card-body metrics">
-          <div className="info-row"><span>蓝牙音频</span><strong className={connected ? 'live-value' : ''}>{labels[status.state]}</strong></div>
           <div className="info-row"><span>当前设备</span><strong>{status.deviceName || ''}</strong></div>
-          <div className="info-row"><span>传输方式</span><strong>A2DP</strong></div>
+          <div className="info-row"><span>蓝牙音频</span><strong className={connected ? 'live-value' : ''}>{labels[status.state]}</strong></div>
           <div className="info-row"><span>媒体控制</span><strong className={cast.mediaReady ? 'live-value' : ''}>{cast.mediaReady ? '已连接' : cast.bluetooth === 'advertising' ? '等待配对' : cast.bluetooth === 'starting' ? '正在开启' : '未连接'}</strong></div>
-          {!cast.mediaReady && <button className="secondary-button media-connect" disabled={!desktop || busy || volumeBusy || cast.bluetooth === 'starting' || cast.bluetooth === 'advertising'} onClick={() => run(() => command('start_bluetooth'))}>{cast.bluetooth === 'advertising' ? '等待手机配对' : '开启媒体控制'}</button>}
+          <div className="info-row"><span>传输方式</span><strong>A2DP</strong></div>
+          {!cast.mediaReady && <button className="secondary-button media-connect" disabled={!desktop || busy || cast.bluetooth === 'starting' || cast.bluetooth === 'advertising'} onClick={() => run(() => command('start_bluetooth'))}>{cast.bluetooth === 'advertising' ? '等待手机配对' : '开启媒体控制'}</button>}
         </div></section>
         <section className="inspector-card"><h3 className="card-heading">音量控制</h3><div className="card-body metrics">
           <div className="audio-control" aria-label="手机音量控制">
-            <button className="icon-button" aria-label={reportedVolume === 0 ? '恢复手机音量' : '手机静音'} title={reportedVolume === 0 ? '恢复手机音量' : '手机静音'} disabled={!volumeAvailable || busy || volumeBusy} onClick={() => adjustVolume(reportedVolume === 0 ? previousVolume.current : 0)}>{shownVolume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
-            <input aria-label="手机音量" title={shownVolume === null ? '等待手机回传音量' : `手机音量 ${Math.round(shownVolume * 100)}%`} type="range" min="0" max="1" step="0.01" disabled={!volumeAvailable || busy} value={shownVolume ?? 0} onChange={e => adjustVolume(Number(e.target.value))} />
+            <button className="icon-button" aria-label={shownVolume === 0 ? '恢复手机音量' : '手机静音'} title={shownVolume === 0 ? '恢复手机音量' : '手机静音'} disabled={!volumeAvailable || busy} onClick={() => adjustVolume(shownVolume === 0 ? previousVolume.current : 0)}>{shownVolume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
+            <VolumeSlider label="手机音量" disabled={!volumeAvailable || busy} value={shownVolume} onChange={adjustVolume} />
           </div>
           {connected && cast.mediaReady && reportedVolume === null && <p className="status-message">等待手机回传音量</p>}
         </div></section>

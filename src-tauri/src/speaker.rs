@@ -84,7 +84,7 @@ pub async fn connect_speaker(app: AppHandle, device_id: String) -> Result<Speake
     tauri::async_runtime::spawn_blocking(move || {
         let _apartment = Apartment::new().map_err(|e| e.to_string())?;
         let state = app.state::<crate::AppState>();
-        state.volume_request.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let volume_request = state.volume_request.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
         let mut speaker = state.speaker.lock().unwrap();
         speaker.disconnect();
         let result = (|| -> Result<(), String> {
@@ -106,7 +106,13 @@ pub async fn connect_speaker(app: AppHandle, device_id: String) -> Result<Speake
             speaker.error = Some(error.clone());
             return Err(error);
         }
-        Ok(speaker.status())
+        let status = speaker.status();
+        drop(speaker);
+        if status.state == "connected" {
+            let app = app.clone();
+            std::thread::spawn(move || synchronize_volume(&app, volume_request));
+        }
+        Ok(status)
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -156,6 +162,53 @@ fn send_usage(app: &AppHandle, usage: u16) -> Result<(), String> {
         service.tx.send(crate::bluetooth::Control::Media(usage, tx)).map_err(|_| "蓝牙控制服务已停止")?;
     }
     rx.recv_timeout(std::time::Duration::from_secs(5)).map_err(|_| "媒体按键发送超时，请检查蓝牙连接".to_string())?
+}
+
+/// Nudge once after connecting when AMS has not supplied its initial volume.
+/// The inverse key is best-effort: an unknown starting level cannot be recovered
+/// exactly, especially if the first key saturated at the upper volume limit.
+fn synchronize_volume(app: &AppHandle, request: u64) {
+    use std::{sync::atomic::Ordering, thread, time::{Duration, Instant}};
+    let Ok(_apartment) = Apartment::new() else { return; };
+    let state = app.state::<crate::AppState>();
+    let active = || state.volume_request.load(Ordering::SeqCst) == request
+        && state.speaker.lock().unwrap().status().state == "connected";
+    let started = Instant::now();
+    // HID can become ready after the A2DP connection. Do not delay connect_speaker.
+    loop {
+        if !active() { return; }
+        let status = state.status.lock().unwrap().clone();
+        if status.media_volume.is_some() { return; }
+        if status.media_ready { break; }
+        if started.elapsed() >= Duration::from_secs(10) { return; }
+        thread::sleep(Duration::from_millis(100));
+    }
+    let _control = state.volume_control.lock().unwrap();
+    let generation = state.media_generation.load(Ordering::SeqCst);
+    let same_connection = || active() && state.media_generation.load(Ordering::SeqCst) == generation
+        && state.status.lock().unwrap().media_ready;
+    // Allow the normal AMS subscription's initial update to arrive first.
+    for _ in 0..8 {
+        if !same_connection() || state.status.lock().unwrap().media_volume.is_some() { return; }
+        thread::sleep(Duration::from_millis(100));
+    }
+    if !same_connection() { return; }
+    if send_usage(app, 0x00e9).is_err() { return; }
+    let sent = Instant::now();
+    let after = loop {
+        if !same_connection() { return; }
+        let volume = state.status.lock().unwrap().media_volume;
+        if volume.is_some() || sent.elapsed() >= Duration::from_millis(1500) { break volume; }
+        thread::sleep(Duration::from_millis(40));
+    };
+    // At the upper limit the original volume may already have been 100%.
+    if after.is_some_and(|volume| volume >= 1.0) { return; }
+    // A manual slider request or disconnect supersedes this automatic operation.
+    if same_connection() && send_usage(app, 0x00ea).is_err() {
+        crate::update_status(app, |status| {
+            status.message = "手机音量恢复指令发送失败，请在手机上确认音量".into();
+        });
+    }
 }
 
 /// The phone exposes incremental volume keys, so converge on a slider target

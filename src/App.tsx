@@ -3,6 +3,7 @@ import { Activity, ArrowDownToLine, Bluetooth, Check, CircleHelp, Expand, Monito
 import { CastStatus, command, desktop, initialStatus, subscribe } from './bridge';
 import metadata from '../package.json';
 import SpeakerView from './SpeakerView';
+import VolumeSlider from './VolumeSlider';
 
 const receiverLabels = { stopped: '未连接', starting: '正在启动', listening: '等待 iPhone', streaming: '投屏中', error: '连接异常' };
 const btLabels = { off: '未开启', starting: '正在开启', advertising: '等待配对', connected: '已连接', error: '不可用' };
@@ -115,7 +116,7 @@ export default function App() {
           <section className="inspector-card">
             <h3 className="card-heading status-heading"><span>音量控制</span><span role="status" className={`heading-state ${!status.muted && status.audio ? 'is-live' : ''}`}><i />{status.muted ? '已静音' : status.audio || '未连接'}</span></h3>
             <div className="card-body">
-              <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" title={`音量 ${Math.round(status.volume * 100)}%`} type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /></div>
+              <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><VolumeSlider label="音量" value={status.volume} onChange={volume => { setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /></div>
             </div>
           </section>
           <section className="inspector-card">
@@ -123,8 +124,8 @@ export default function App() {
             <div className="card-body metrics">
               <div className="info-row"><span>接收帧率</span><strong className={status.receiver === 'streaming' ? 'live-value' : ''}>{status.receivedFps.toFixed(1)} fps</strong></div>
               <div className="info-row"><span>呈现帧率</span><strong className={status.receiver === 'streaming' ? 'live-value' : ''}>{status.presentedFps.toFixed(1)} fps</strong></div>
-              <div className="info-row"><span>分辨率</span><strong>{status.width ? `${status.width} × ${status.height}` : ''}</strong></div>
-              <div className="info-row"><span>视频解码</span><strong>{status.decoder || '未连接'}</strong></div>
+              <div className="info-row"><span>分辨率</span><strong>{status.width ? `${status.width} × ${status.height}` : '-'}</strong></div>
+              <div className="info-row"><span>视频解码</span><strong>{status.decoder || '-'}</strong></div>
               {status.testMode && <p className="test-label">当前为测试源</p>}
             </div>
           </section>

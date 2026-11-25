@@ -20,7 +20,11 @@ use std::{
     thread,
     time::Duration,
 };
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WindowEvent};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, WindowEvent,
+};
 use windows::Win32::{
     Foundation::{CloseHandle, HANDLE},
     System::{
@@ -703,10 +707,58 @@ fn export_diagnostics(app: AppHandle) -> Result<String, String> {
     });
     Ok(path.to_string_lossy().into_owned())
 }
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        let _ = send(app, json!({"cmd":"relayout"}));
+    }
+}
+
+fn shutdown(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    state.volume_request.fetch_add(1, Ordering::SeqCst);
+    state.session.fetch_add(1, Ordering::SeqCst);
+    state.speaker.lock().unwrap().disconnect();
+    save_preferences(app);
+    release_pointer(app);
+    if let Some(service) = state.bluetooth.lock().unwrap().take() {
+        service.finish();
+    }
+    // Finish the receiver before the event loop and process exit.
+    let process = state.receiver.lock().unwrap().take();
+    drop(process);
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .setup(|app| {
+            let open = MenuItem::with_id(app, "open", "打开澄镜", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let icon = app.default_window_icon().cloned().ok_or("缺少应用图标")?;
+            TrayIconBuilder::with_id("main")
+                .icon(icon)
+                .tooltip("澄镜 · iPhone Cast")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => show_main_window(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if matches!(event, TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    }) {
+                        show_main_window(tray.app_handle());
+                    }
+                })
+                .build(app)?;
             if let Ok(directory) = app.path().app_config_dir() {
                 if let Ok(bytes) = fs::read(directory.join("settings.json")) {
                     if let Ok(preferences) = serde_json::from_slice::<Preferences>(&bytes) {
@@ -749,6 +801,14 @@ fn main() {
         ])
         .on_window_event(|window, event| {
             match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    if window.label() == "main" {
+                        api.prevent_close();
+                        release_pointer(window.app_handle());
+                        save_preferences(window.app_handle());
+                        let _ = window.hide();
+                    }
+                }
                 WindowEvent::Focused(false) => {
                     // The renderer is a child HWND in another process. Its activation
                     // must not turn an in-progress phone drag into a release.
@@ -771,22 +831,14 @@ fn main() {
                         let _ = send(&queued, json!({"cmd":"relayout"}));
                     });
                 }
-                WindowEvent::Destroyed => {
-                    let app = window.app_handle();
-                    let state = app.state::<AppState>();
-                    state.session.fetch_add(1, Ordering::SeqCst);
-                    state.speaker.lock().unwrap().disconnect();
-                    save_preferences(app);
-                    release_pointer(app);
-                    if let Some(service) = state.bluetooth.lock().unwrap().as_ref() {
-                        service.finish();
-                    }
-                    let process = state.receiver.lock().unwrap().take();
-                    thread::spawn(move || drop(process));
-                }
                 _ => {}
             }
         })
-        .run(tauri::generate_context!())
-        .expect("运行 Tauri 应用失败");
+        .build(tauri::generate_context!())
+        .expect("运行 Tauri 应用失败")
+        .run(|app, event| {
+            if matches!(event, RunEvent::Exit) {
+                shutdown(app);
+            }
+        });
 }
