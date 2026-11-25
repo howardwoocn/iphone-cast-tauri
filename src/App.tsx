@@ -70,22 +70,20 @@ export default function App() {
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><Radio size={23} /></span><strong>澄镜</strong></div>
-      <button className={`nav-item ${mode === 'cast' ? 'selected' : ''}`} disabled={busy} onClick={() => switchMode('cast')}><Smartphone size={18} />手机投屏</button>
-      <button className={`nav-item ${mode === 'speaker' ? 'selected' : ''}`} disabled={busy} onClick={() => switchMode('speaker')}><Bluetooth size={18} />蓝牙音箱</button>
+      <button className={`nav-item mode-nav ${mode === 'cast' ? 'selected' : ''}`} disabled={busy} onClick={() => switchMode('cast')}><Smartphone size={22} /><span>手机投屏</span></button>
+      <button className={`nav-item mode-nav ${mode === 'speaker' ? 'selected' : ''}`} disabled={busy} onClick={() => switchMode('speaker')}><Bluetooth size={22} /><span>蓝牙音箱</span></button>
       <div className="sidebar-bottom">
-        <button className="nav-item" onClick={() => setDialog('help')}><CircleHelp size={18} />连接帮助</button>
-        <button className="nav-item" onClick={() => setDialog('settings')}><Settings2 size={18} />设置</button>
-        <div className="version">v{metadata.version}</div>
+        <button className="nav-item utility-nav" aria-label="连接帮助" title="连接帮助" onClick={() => setDialog('help')}><CircleHelp size={20} /></button>
+        <button className="nav-item utility-nav" aria-label="设置" title="设置" onClick={() => setDialog('settings')}><Settings2 size={20} /></button>
       </div>
     </aside>
 
     <main>
       {mode === 'speaker' ? <SpeakerView cast={status} onBusy={setBusy} /> : <>
-      <header><h1>手机投屏</h1><div className={`connection-pill ${status.receiver === 'streaming' ? 'live' : ''}`}><i />{receiverLabels[status.receiver]}</div></header>
-      {!desktop && <div className="preview-notice">界面预览 · 桌面应用可使用全部功能</div>}
+      <div className="mode-layout">
+      <header><div className="header-title"><h1>手机投屏</h1>{!desktop && <span className="preview-notice">界面预览 · 桌面应用可使用全部功能</span>}</div><div className="header-actions"><button className="icon-button" aria-label="专注模式" title="专注模式 · F11" disabled={!active} onClick={() => run(() => command('set_focus', { enabled: true }))}><Expand size={18} /></button></div></header>
       <section className="workspace">
         <div className="display-card">
-          <div className="display-top"><div><span className="signal-dot" />实时画面<span className="subtle">AIRPLAY</span></div><button className="icon-button" title="专注模式 · F11" disabled={!active} onClick={() => run(() => command('set_focus', { enabled: true }))}><Expand size={17} /></button></div>
           <div className={`viewport ${status.receiver === 'streaming' ? 'has-stream' : ''}`} ref={viewport}>
             {status.receiver !== 'streaming' && <div className="empty-display">
               <div className="device-illustration"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="phone-outline"><span /><Radio size={29} /><i /></div><div className="wifi-float"><Wifi size={20} /></div></div>
@@ -95,10 +93,10 @@ export default function App() {
               {active && <div className="waiting"><span />正在广播 · {status.receiverName}</div>}
             </div>}
           </div>
-          <div className="display-toolbar"><div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /><span>{Math.round(status.volume * 100)}%</span></div><button className="text-button" disabled={!active} onClick={() => run(() => command('set_focus', { enabled: true }))}><Expand size={15} />专注模式<kbd>F11</kbd></button></div>
         </div>
 
         <aside className="details-panel">
+          <div className="inspector-content">
           <section className="inspector-card">
             <h3 className="card-heading">连接状态</h3>
             <div className="card-body">
@@ -117,23 +115,31 @@ export default function App() {
             </div>
           </section>
           <section className="inspector-card">
+            <h3 className="card-heading">声音</h3>
+            <div className="card-body">
+              <div className="info-row audio-state"><span>播放状态</span><strong>{status.muted ? '已静音' : status.audio || '待连接'}</strong></div>
+              <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /><span>{Math.round(status.volume * 100)}%</span></div>
+            </div>
+          </section>
+          <section className="inspector-card">
             <h3 className="card-heading">传输状态</h3>
             <div className="card-body metrics">
               <div className="info-row"><span>接收帧率</span><strong className={status.receiver === 'streaming' ? 'live-value' : ''}>{status.receivedFps.toFixed(1)} fps</strong></div>
               <div className="info-row"><span>呈现帧率</span><strong className={status.receiver === 'streaming' ? 'live-value' : ''}>{status.presentedFps.toFixed(1)} fps</strong></div>
               <div className="info-row"><span>分辨率</span><strong>{status.width ? `${status.width} × ${status.height}` : '—'}</strong></div>
               <div className="info-row"><span>视频解码</span><strong>{status.decoder || '待连接'}</strong></div>
-              <div className="info-row"><span>声音</span><strong>{status.muted ? '已静音' : status.audio || '待连接'}</strong></div>
               {status.testMode && <p className="test-label">当前为测试源</p>}
             </div>
           </section>
+          </div>
         </aside>
       </section>
+      </div>
       <footer><div><span className={active ? 'signal-dot' : 'idle-dot'} />{status.message}</div><span className="footer-note"><Wifi size={14} />{status.receiver === 'streaming' ? '投屏已连接' : receiverLabels[status.receiver]}<span>·</span><Bluetooth size={14} />蓝牙 {btLabels[status.bluetooth]}</span></footer>
       </>}
       {error && <div role="alert" className="error-toast"><span>{error}</span><button className="icon-button" title="关闭提示" onClick={() => setError('')}><X size={15} /></button></div>}
     </main>
-      {dialog && <div className="modal-backdrop" onClick={() => setDialog(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title" onClick={e => e.stopPropagation()}><button className="modal-close icon-button" title="关闭" onClick={() => setDialog(null)}><X size={20} /></button><span className="eyebrow">澄镜 · IPHONE CAST</span><h2 id="dialog-title">{dialog === 'help' ? '连接帮助' : '投屏设置'}</h2>{dialog === 'help' ? <><div className="help-row"><Wifi /><div><h3>画面与声音</h3><p>电脑与 iPhone 连接同一 Wi-Fi。开始接收后，在控制中心 → 屏幕镜像中选择「{status.receiverName}」。</p></div></div><div className="help-row"><Bluetooth /><div><h3>鼠标控制</h3><p>配对电脑后，前往 设置 → 辅助功能 → 触控 → 辅助触控，开启辅助触控及「执行触控手势」，即可用鼠标点击和滑动。</p></div></div><div className="help-row"><Bluetooth /><div><h3>蓝牙音箱与播放控制</h3><p>先在 Windows 蓝牙设置中配对手机，再到蓝牙音箱模式刷新并连接。媒体控制使用同一套蓝牙 HID 服务，请确认配对的是当前播放的手机。升级新增媒体按键后可能需要忽略电脑并重新配对一次，之后切换模式无需重新配对。首次播放请在手机音乐应用中开始播放。</p></div></div><div className="help-row"><Expand /><div><h3>专注模式</h3><p>按 F11 进入专注模式，Esc 返回。按住 Alt 拖动移动窗口，Alt + 拖动边角等比缩放。</p></div></div></> : <><label className="field-label">AirPlay 接收名称<input className="text-input" maxLength={48} value={name} disabled={active} onChange={e => setName(e.target.value)} /></label><p>新名称将在下次开始接收时生效。声音输出到 Windows 默认播放设备。</p><div className="setting-row"><div><strong>60fps 目标</strong><p>实际帧率由手机、内容与网络决定。</p></div><Check size={18} /></div><div className="setting-row"><div><strong>原生硬件解码</strong><p>优先 Direct3D 11，不可用时使用软件解码。</p></div><Check size={18} /></div><button className="secondary-button" disabled={active || busy} onClick={() => run(async () => { setDialog(null); await command('start_receiver', { name, testMode: true }); })}><Activity size={16} />运行 60fps 本机测试源</button><button className="secondary-button diagnostics" onClick={() => run(() => command('export_diagnostics'))}><ArrowDownToLine size={16} />导出诊断报告</button></>}<div className="modal-foot"><Smartphone size={15} />Windows 11 x64 · iPhone · 本地连接</div></section></div>}
+      {dialog && <div className="modal-backdrop" onClick={() => setDialog(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title" onClick={e => e.stopPropagation()}><button className="modal-close icon-button" title="关闭" onClick={() => setDialog(null)}><X size={20} /></button><span className="eyebrow">澄镜 · IPHONE CAST</span><h2 id="dialog-title">{dialog === 'help' ? '连接帮助' : '设置'}</h2>{dialog === 'help' ? <><div className="help-row"><Wifi /><div><h3>画面与声音</h3><p>电脑与 iPhone 连接同一 Wi-Fi。开始接收后，在控制中心 → 屏幕镜像中选择「{status.receiverName}」。</p></div></div><div className="help-row"><Bluetooth /><div><h3>鼠标控制</h3><p>配对电脑后，前往 设置 → 辅助功能 → 触控 → 辅助触控，开启辅助触控及「执行触控手势」，即可用鼠标点击和滑动。</p></div></div><div className="help-row"><Bluetooth /><div><h3>蓝牙音箱与播放控制</h3><p>先在 Windows 蓝牙设置中配对手机，再到蓝牙音箱模式刷新并连接。媒体控制使用同一套蓝牙 HID 服务，请确认配对的是当前播放的手机。升级新增媒体按键后可能需要忽略电脑并重新配对一次，之后切换模式无需重新配对。首次播放请在手机音乐应用中开始播放。</p></div></div><div className="help-row"><Expand /><div><h3>专注模式</h3><p>按 F11 进入专注模式，Esc 返回。按住 Alt 拖动移动窗口，Alt + 拖动边角等比缩放。</p></div></div></> : <><label className="field-label">AirPlay 接收名称<input className="text-input" maxLength={48} value={name} disabled={active} onChange={e => setName(e.target.value)} /></label><p>新名称将在下次开始接收时生效。声音输出到 Windows 默认播放设备。</p><div className="setting-row"><div><strong>60fps 目标</strong><p>实际帧率由手机、内容与网络决定。</p></div><Check size={18} /></div><div className="setting-row"><div><strong>原生硬件解码</strong><p>优先 Direct3D 11，不可用时使用软件解码。</p></div><Check size={18} /></div><button className="secondary-button" disabled={active || busy} onClick={() => run(async () => { setDialog(null); await command('start_receiver', { name, testMode: true }); })}><Activity size={16} />运行 60fps 本机测试源</button><button className="secondary-button diagnostics" onClick={() => run(() => command('export_diagnostics'))}><ArrowDownToLine size={16} />导出诊断报告</button><div className="setting-row"><strong>版本</strong><span>v{metadata.version}</span></div></>}<div className="modal-foot"><Smartphone size={15} />Windows 11 x64 · iPhone · 本地连接</div></section></div>}
   </div>;
 }
 

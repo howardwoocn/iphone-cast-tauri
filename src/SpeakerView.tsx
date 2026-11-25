@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bluetooth, Play, Pause, RefreshCw, SkipBack, SkipForward, Smartphone, Volume2, X } from 'lucide-react';
+import { Bluetooth, Play, Pause, RefreshCw, SkipBack, SkipForward, Smartphone, X } from 'lucide-react';
 import { CastStatus, command, desktop, initialSpeakerStatus, SpeakerDevice, SpeakerStatus } from './bridge';
 
 const labels = { off: '未连接', connected: '已连接', disconnected: '已断开', error: '连接异常' };
@@ -45,11 +45,10 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
   });
 
   return <>
-    <header><h1>蓝牙音箱</h1><div className={`connection-pill ${connected ? 'live' : ''}`}><i />{labels[status.state]}</div></header>
-    {!desktop && <div className="preview-notice">界面预览 · 桌面应用可使用全部功能</div>}
+    <div className="mode-layout">
+    <header><div className="header-title"><h1>蓝牙音箱</h1>{!desktop && <span className="preview-notice">界面预览 · 桌面应用可使用全部功能</span>}</div></header>
     <section className="workspace">
       <div className="display-card speaker-display">
-        <div className="display-top"><div>音频接收<span className="subtle">BLUETOOTH</span></div></div>
         <div className="speaker-stage">
           <div className="speaker-content">
             <div className="playback-controls" aria-label="手机播放控制">
@@ -62,9 +61,9 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
           </div>
           <div className="sound-rings" aria-hidden="true" />
         </div>
-        <div className="display-toolbar speaker-toolbar"><span><Volume2 size={18} />Windows 默认播放设备</span><small>音量由手机与 Windows 调整</small></div>
       </div>
       <aside className="details-panel">
+          <div className="inspector-content">
         <section className="inspector-card">
           <div className="card-heading speaker-heading"><h3>手机设备</h3><button className="refresh-button" disabled={!desktop || busy} onClick={() => run(refresh)}><RefreshCw size={14} />刷新</button></div>
           <div className="card-body device-list">
@@ -80,8 +79,10 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
           {!cast.mediaReady && <button className="secondary-button media-connect" disabled={!desktop || busy || cast.bluetooth === 'starting' || cast.bluetooth === 'advertising'} onClick={() => run(() => command('start_bluetooth'))}>{cast.bluetooth === 'advertising' ? '等待手机配对' : '开启媒体控制'}</button>}
         </div></section>
         <section className="inspector-card"><h3 className="card-heading">声音输出</h3><div className="card-body metrics"><div className="info-row"><span>输出设备</span><strong>系统默认</strong></div><div className="info-row"><span>音量控制</span><strong>手机与 Windows</strong></div></div></section>
+          </div>
       </aside>
     </section>
+    </div>
     <footer><div><span className={connected ? 'signal-dot' : 'idle-dot'} />{connected ? `已连接 ${status.deviceName}` : status.message}</div><span className="footer-note"><Bluetooth size={14} />蓝牙音频</span></footer>
     {error && <div role="alert" className="error-toast"><span>{error}</span><button className="icon-button" title="关闭提示" onClick={() => setError('')}><X size={15} /></button></div>}
   </>;

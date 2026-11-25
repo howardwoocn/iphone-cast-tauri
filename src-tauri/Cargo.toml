@@ -1,6 +1,6 @@
 [package]
 name = "iphone-cast-tauri"
-version = "0.1.3"
+version = "1.0.0"
 description = "Local iPhone AirPlay mirroring and Bluetooth pointer control"
 edition = "2021"
 license = "GPL-3.0-or-later"
