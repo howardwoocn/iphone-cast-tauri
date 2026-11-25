@@ -106,7 +106,6 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
           <div className="audio-control" aria-label="手机音量控制">
             <button className="icon-button" aria-label={reportedVolume === 0 ? '恢复手机音量' : '手机静音'} title={reportedVolume === 0 ? '恢复手机音量' : '手机静音'} disabled={!volumeAvailable || busy || volumeBusy} onClick={() => adjustVolume(reportedVolume === 0 ? previousVolume.current : 0)}>{shownVolume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
             <input aria-label="手机音量" title={reportedVolume === null ? '等待手机回传音量' : '手机音量'} type="range" min="0" max="1" step="0.01" disabled={!volumeAvailable || busy} value={shownVolume ?? 0} onChange={e => adjustVolume(Number(e.target.value))} />
-            <span>{shownVolume === null ? '—' : `${Math.round(shownVolume * 100)}%`}</span>
           </div>
           {connected && cast.mediaReady && reportedVolume === null && <p className="status-message">等待手机回传音量</p>}
         </div></section>

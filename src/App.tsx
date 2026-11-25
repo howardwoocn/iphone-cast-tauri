@@ -115,7 +115,7 @@ export default function App() {
           <section className="inspector-card">
             <h3 className="card-heading status-heading"><span>音量控制</span><span role="status" className={`heading-state ${!status.muted && status.audio ? 'is-live' : ''}`}><i />{status.muted ? '已静音' : status.audio || '待连接'}</span></h3>
             <div className="card-body">
-              <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /><span>{Math.round(status.volume * 100)}%</span></div>
+              <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /></div>
             </div>
           </section>
           <section className="inspector-card">
