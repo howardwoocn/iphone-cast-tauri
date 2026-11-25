@@ -113,9 +113,9 @@ export default function App() {
             </div>
           </section>
           <section className="inspector-card">
-            <h3 className="card-heading status-heading"><span>音量控制</span><span role="status" className={`heading-state ${!status.muted && status.audio ? 'is-live' : ''}`}><i />{status.muted ? '已静音' : status.audio || '待连接'}</span></h3>
+            <h3 className="card-heading status-heading"><span>音量控制</span><span role="status" className={`heading-state ${!status.muted && status.audio ? 'is-live' : ''}`}><i />{status.muted ? '已静音' : status.audio || '未连接'}</span></h3>
             <div className="card-body">
-              <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /></div>
+              <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" title={`音量 ${Math.round(status.volume * 100)}%`} type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /></div>
             </div>
           </section>
           <section className="inspector-card">
@@ -123,8 +123,8 @@ export default function App() {
             <div className="card-body metrics">
               <div className="info-row"><span>接收帧率</span><strong className={status.receiver === 'streaming' ? 'live-value' : ''}>{status.receivedFps.toFixed(1)} fps</strong></div>
               <div className="info-row"><span>呈现帧率</span><strong className={status.receiver === 'streaming' ? 'live-value' : ''}>{status.presentedFps.toFixed(1)} fps</strong></div>
-              <div className="info-row"><span>分辨率</span><strong>{status.width ? `${status.width} × ${status.height}` : '—'}</strong></div>
-              <div className="info-row"><span>视频解码</span><strong>{status.decoder || '待连接'}</strong></div>
+              <div className="info-row"><span>分辨率</span><strong>{status.width ? `${status.width} × ${status.height}` : ''}</strong></div>
+              <div className="info-row"><span>视频解码</span><strong>{status.decoder || '未连接'}</strong></div>
               {status.testMode && <p className="test-label">当前为测试源</p>}
             </div>
           </section>
