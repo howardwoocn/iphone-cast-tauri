@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod bluetooth;
 mod input;
+mod speaker;
+mod media_state;
 
 use bluetooth::{BluetoothService, Control, PointerInput};
 use serde::{Deserialize, Serialize};
@@ -41,6 +43,8 @@ pub struct CastStatus {
     bluetooth: String,
     message: String,
     bluetooth_message: String,
+    media_ready: bool,
+    media_playback: String,
     receiver_name: String,
     received_fps: f64,
     presented_fps: f64,
@@ -61,6 +65,8 @@ impl Default for CastStatus {
             bluetooth: "off".into(),
             message: "准备连接你的 iPhone".into(),
             bluetooth_message: "蓝牙控制尚未开启".into(),
+            media_ready: false,
+            media_playback: "unknown".into(),
             receiver_name: "澄镜 iPhone Cast".into(),
             received_fps: 0.0,
             presented_fps: 0.0,
@@ -92,9 +98,11 @@ pub struct AppState {
     status: Mutex<CastStatus>,
     receiver: Mutex<Option<ReceiverProcess>>,
     pub bluetooth: Mutex<Option<BluetoothService>>,
+    speaker: Mutex<speaker::Speaker>,
     viewport: Mutex<Viewport>,
     restore: Mutex<Option<RestoreWindow>>,
     session: AtomicU64,
+    media_generation: AtomicU64,
 }
 impl Default for AppState {
     fn default() -> Self {
@@ -102,9 +110,11 @@ impl Default for AppState {
             status: Mutex::new(CastStatus::default()),
             receiver: Mutex::new(None),
             bluetooth: Mutex::new(None),
+            speaker: Mutex::new(speaker::Speaker::default()),
             viewport: Mutex::new(Viewport::default()),
             restore: Mutex::new(None),
             session: AtomicU64::new(0),
+            media_generation: AtomicU64::new(0),
         }
     }
 }
@@ -715,6 +725,11 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_status,
+            speaker::list_speaker_devices,
+            speaker::get_speaker_status,
+            speaker::connect_speaker,
+            speaker::disconnect_speaker,
+            speaker::send_media_control,
             start_receiver,
             stop_receiver,
             start_bluetooth,
@@ -753,6 +768,7 @@ fn main() {
                     let app = window.app_handle();
                     let state = app.state::<AppState>();
                     state.session.fetch_add(1, Ordering::SeqCst);
+                    state.speaker.lock().unwrap().disconnect();
                     save_preferences(app);
                     release_pointer(app);
                     if let Some(service) = state.bluetooth.lock().unwrap().as_ref() {

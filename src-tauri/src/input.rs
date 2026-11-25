@@ -3,6 +3,7 @@
 pub const ABSOLUTE_MAX: u16 = 32767;
 pub const ABSOLUTE_ID: u8 = 1;
 pub const MOUSE_ID: u8 = 2;
+pub const MEDIA_ID: u8 = 3;
 
 // Standard HID mouse collections. Input reports exclude report ID; the GATT
 // Report Reference descriptor identifies each characteristic.
@@ -114,6 +115,10 @@ pub const REPORT_MAP: &[u8] = &[
     0x06,
     0xC0,
     0xC0,
+    // Consumer Control, 16-bit usage array. Existing mouse reports stay intact.
+    0x05, 0x0c, 0x09, 0x01, 0xa1, 0x01, 0x85, MEDIA_ID,
+    0x15, 0x00, 0x26, 0xff, 0x03, 0x19, 0x00, 0x2a, 0xff, 0x03,
+    0x75, 0x10, 0x95, 0x01, 0x81, 0x00, 0xc0,
 ];
 
 pub fn absolute_report(x: f64, y: f64) -> Option<[u8; 5]> {

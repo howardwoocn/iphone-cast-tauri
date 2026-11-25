@@ -1,4 +1,4 @@
-use crate::input::{PointerState, ABSOLUTE_ID, MOUSE_ID, REPORT_MAP};
+use crate::input::{PointerState, ABSOLUTE_ID, MEDIA_ID, MOUSE_ID, REPORT_MAP};
 use serde::Deserialize;
 use std::{
     sync::mpsc::{self, Receiver, Sender},
@@ -40,6 +40,7 @@ impl PointerInput {
 
 pub enum Control {
     Input(PointerInput),
+    Media(u16, Sender<Result<(), String>>),
     Stop,
 }
 pub struct BluetoothService {
@@ -58,6 +59,7 @@ fn buffer(bytes: &[u8]) -> WinResult<IBuffer> {
 fn update(app: &AppHandle, state: &str, message: &str) {
     crate::update_status(app, |s| {
         s.bluetooth = state.into();
+        if state == "off" || state == "error" { s.media_ready = false; }
         s.bluetooth_message = message.into();
     });
 }
@@ -216,6 +218,7 @@ async fn run(app: &AppHandle, rx: Receiver<Control>) -> WinResult<()> {
     control.WriteRequested(&handler)?;
     let absolute = report(&service, ABSOLUTE_ID, &[0; 5]).await?;
     let mouse = report(&service, MOUSE_ID, &[0; 4]).await?;
+    let media = report(&service, MEDIA_ID, &[0; 2]).await?;
     let params = GattServiceProviderAdvertisingParameters::new()?;
     params.SetIsConnectable(true)?;
     params.SetIsDiscoverable(true)?;
@@ -230,7 +233,24 @@ async fn run(app: &AppHandle, rx: Receiver<Control>) -> WinResult<()> {
     let mut pointer = PointerState::default();
     let mut sequence_error: Option<windows::core::Error> = None;
     let mut pending: Option<Control> = None;
+    let mut media_ready = false;
+    let mut media_monitor = None;
+    let mut monitored_device = None;
     loop {
+        let media_clients = media.SubscribedClients()?;
+        let subscribed = media_clients.Size()? == 1;
+        let device = if subscribed { Some(media_clients.GetAt(0)?.Session()?.DeviceId()?.Id()?.to_string()) } else { None };
+        if device != monitored_device {
+            drop(media_monitor.take());
+            if let Some(id) = &device {
+                media_monitor = Some(crate::media_state::MediaMonitor::start(app.clone(), id.clone()));
+            }
+            monitored_device = device;
+        }
+        if subscribed != media_ready {
+            media_ready = subscribed;
+            crate::update_status(app, |s| s.media_ready = subscribed);
+        }
         let absolute_clients = absolute.SubscribedClients()?;
         let mouse_clients = mouse.SubscribedClients()?;
         let subscribers = absolute_clients.Size()? == 1
@@ -276,6 +296,23 @@ async fn run(app: &AppHandle, rx: Receiver<Control>) -> WinResult<()> {
                     }
                 }
                 continue;
+            }
+            Ok(Control::Media(usage, reply)) => {
+                let sent = async {
+                    let media_clients = media.SubscribedClients()?;
+                    let mouse_clients = mouse.SubscribedClients()?;
+                    if media_clients.Size()? != 1 || (mouse_clients.Size()? == 1
+                        && media_clients.GetAt(0)?.Session()?.DeviceId()?.Id()?
+                        != mouse_clients.GetAt(0)?.Session()?.DeviceId()?.Id()?) {
+                        return Err(windows::core::Error::new(windows::core::HRESULT(0x80004005u32 as i32), "媒体控制与鼠标必须连接同一台手机"));
+                    }
+                    notify(&media, &usage.to_le_bytes()).await?;
+                    thread::sleep(Duration::from_millis(40));
+                    notify(&media, &[0; 2]).await
+                }.await;
+                // Always try to release after an interrupted press as well.
+                if sent.is_err() { let _ = notify(&media, &[0; 2]).await; }
+                let _ = reply.send(sent.map_err(|e| e.to_string()));
             }
             Ok(Control::Input(mut input)) => {
                 if !connected {
@@ -330,6 +367,7 @@ async fn run(app: &AppHandle, rx: Receiver<Control>) -> WinResult<()> {
     if connected {
         let _ = notify(&mouse, &[0; 4]).await;
     }
+    let _ = notify(&media, &[0; 2]).await;
     provider.StopAdvertising()?;
     if let Some(error) = sequence_error {
         return Err(error);

@@ -43,3 +43,19 @@
 6. 拖动期间断开蓝牙、切换应用、停止接收、关闭程序，均不持续按住手机按钮。
 
 **目前没有完成指定 iPhone 的实际连接与精度测试，不声明准确点击或真机持续 60fps 已达标。**若绝对定位不被该设备接受，按计划记录阻塞，不降级为相对移动后声称通过。
+
+
+## 蓝牙音箱与媒体控制（开发中）
+
+前端生产构建、Rust 编译检查及 10 项既有鼠标回归测试通过；浏览器检查了模式切换、未连接状态下的播放按钮及状态卡片布局。新增音频接口使用 Windows AudioPlaybackConnection，HID 新增 Consumer Control 报告 ID 3，既有鼠标报告 ID 1/2 保持不变。
+
+仍需真机验证：Windows 配对后刷新列表与连接；手机音乐输出到电脑；上一首、播放/暂停、下一首；首次更新后重新配对；重复切换模式后无需配对且鼠标点击/拖动正常；手机关闭蓝牙后的状态更新与重连；应用退出后音频接收释放。本次未打包、安装或操作手机。
+
+
+### 大小双圆播放控制与状态
+
+中央播放/暂停合并为标准 Consumer Control Toggle（0xCD），按钮仅显示一个图标并保留悬停提示及无障碍名称。上一首/下一首位于内外圈之间，不带独立按钮圆环。
+
+新增 Apple Media Service 播放状态订阅：从 HID 订阅客户端获得当前 iPhone 标识，在独立线程发现 AMS 并订阅 Player/PlaybackInfo。仅依据有效通知切换图标；断线、服务变更、无效或截断通知时回到 unknown，延迟回调以连接代数隔离。手机不提供 AMS 时仍可发送媒体切换按键，不伪造播放状态。
+
+12 项测试通过，包含原鼠标回归和 AMS 正常、扫描、截断、无关与非法数据解析。手机端操作同步、AMS 可用性、实际播放控制及断线重连仍需真机验收。接口依据 Apple 官方 AMS 规范：https://developer.apple.com/library/archive/documentation/CoreBluetooth/Reference/AppleMediaService_Reference/Specification/Specification.html
