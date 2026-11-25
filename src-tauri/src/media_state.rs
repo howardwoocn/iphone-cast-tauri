@@ -25,10 +25,25 @@ pub fn playback_state(bytes: &[u8]) -> Option<&'static str> {
     match parts[0] { "0" => Some("paused"), "1" | "2" | "3" => Some("playing"), _ => None }
 }
 
+pub fn phone_volume(bytes: &[u8]) -> Option<f64> {
+    if bytes.len() < 4 || bytes[..3] != [0, 2, 0] { return None; }
+    let value: f64 = std::str::from_utf8(&bytes[3..]).ok()?.parse().ok()?;
+    (value.is_finite() && (0.0..=1.0).contains(&value)).then_some(value)
+}
+
+fn publish_volume(app: &AppHandle, generation: u64, volume: Option<f64>) {
+    crate::update_status(app, |status| {
+        if app.state::<crate::AppState>().media_generation.load(Ordering::SeqCst) == generation {
+            status.media_volume = volume;
+        }
+    });
+}
+
 fn publish(app: &AppHandle, generation: u64, playback: &str) {
     crate::update_status(app, |status| {
         if app.state::<crate::AppState>().media_generation.load(Ordering::SeqCst) == generation {
             status.media_playback = playback.into();
+            if playback == "unknown" { status.media_volume = None; }
         }
     });
 }
@@ -91,6 +106,9 @@ fn subscribe(app: &AppHandle, generation: u64, id: &str, stopped: &Arc<AtomicBoo
             let mut bytes = vec![0; reader.UnconsumedBufferLength()? as usize];
             reader.ReadBytes(&mut bytes)?;
             // Ignore unrelated attributes, but invalidate malformed playback data.
+            if bytes.starts_with(&[0, 2]) {
+                publish_volume(&callback_app, generation, phone_volume(&bytes));
+            }
             if bytes.starts_with(&[0, 1]) {
                 publish(&callback_app, generation, playback_state(&bytes).unwrap_or("unknown"));
             }
@@ -101,7 +119,7 @@ fn subscribe(app: &AppHandle, generation: u64, id: &str, stopped: &Arc<AtomicBoo
         let status = entity.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify)?.get()?;
         if status != GattCommunicationStatus::Success { return Ok(()); }
         let writer = DataWriter::new()?;
-        writer.WriteBytes(&[0, 1])?; // Player / PlaybackInfo; includes initial state.
+        writer.WriteBytes(&[0, 1, 2])?; // Player / PlaybackInfo and Volume; includes initial values.
         let status = entity.WriteValueWithOptionAsync(&writer.DetachBuffer()?, GattWriteOption::WriteWithResponse)?.get()?;
         if status != GattCommunicationStatus::Success { return Ok(()); }
         while !stopped.load(Ordering::SeqCst) && !invalidated.load(Ordering::SeqCst)
@@ -118,7 +136,14 @@ fn subscribe(app: &AppHandle, generation: u64, id: &str, stopped: &Arc<AtomicBoo
 
 #[cfg(test)]
 mod tests {
-    use super::playback_state;
+    use super::{playback_state, phone_volume};
+    #[test]
+    fn validates_phone_volume_feedback() {
+        assert_eq!(phone_volume(b"\x00\x02\x000.625"), Some(0.625));
+        assert_eq!(phone_volume(b"\x00\x02\x000"), Some(0.0));
+        assert_eq!(phone_volume(b"\x00\x02\x001"), Some(1.0));
+        for value in [b"\x00\x02\x00NaN".as_slice(), b"\x00\x02\x001.1", b"\x00\x02\x00-0.1", b"\x00\x02\x010.5", b"\x00\x01\x000.5"] { assert_eq!(phone_volume(value), None); }
+    }
     #[test]
     fn decodes_real_ams_states_and_scanning() {
         assert_eq!(playback_state(b"\x00\x01\x000,0,12.5"), Some("paused"));

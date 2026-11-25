@@ -6,13 +6,14 @@ export type CastStatus = {
   bluetooth: 'off' | 'starting' | 'advertising' | 'connected' | 'error';
   mediaReady: boolean;
   mediaPlayback: 'unknown' | 'playing' | 'paused';
+  mediaVolume: number | null;
   message: string; bluetoothMessage: string; receiverName: string;
   receivedFps: number; presentedFps: number; dropped: number;
   width: number; height: number; decoder: string; audio: string;
   volume: number; muted: boolean; focus: boolean; testMode: boolean;
 };
 export const initialStatus: CastStatus = {
-  receiver: 'stopped', bluetooth: 'off', mediaReady: false, mediaPlayback: 'unknown', message: '准备连接你的 iPhone',
+  receiver: 'stopped', bluetooth: 'off', mediaReady: false, mediaPlayback: 'unknown', mediaVolume: null, message: '准备连接你的 iPhone',
   bluetoothMessage: '蓝牙控制尚未开启', receiverName: '澄镜 iPhone Cast',
   receivedFps: 0, presentedFps: 0, dropped: 0, width: 0, height: 0,
   decoder: '', audio: '', volume: 0.8, muted: false, focus: false, testMode: false

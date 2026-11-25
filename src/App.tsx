@@ -98,26 +98,23 @@ export default function App() {
         <aside className="details-panel">
           <div className="inspector-content">
           <section className="inspector-card">
-            <h3 className="card-heading">连接状态</h3>
+            <h3 className="card-heading status-heading"><span>连接状态</span><span role="status" className={`heading-state ${status.receiver === 'streaming' ? 'is-live' : ''}`}><i />{status.receiver === 'streaming' ? '已连接' : receiverLabels[status.receiver]}</span></h3>
             <div className="card-body">
-              <div className={`state-line ${status.receiver === 'streaming' ? 'is-live' : ''}`}><i />{status.receiver === 'streaming' ? '已连接' : receiverLabels[status.receiver]}</div>
               {status.receiver === 'streaming' && <div className="device-line"><Smartphone size={18} />iPhone</div>}
               <div className="info-row receiver-row"><span>接收名称</span><strong>{status.receiverName}</strong></div>
               <button className="secondary-button" disabled={busy || status.receiver === 'starting'} onClick={() => run(() => active ? command('stop_receiver') : command('start_receiver', { name, testMode: false }))}>{active ? <Square size={15} /> : <Play size={15} />}{active ? '停止投屏' : '开始接收投屏'}</button>
             </div>
           </section>
           <section className="inspector-card">
-            <h3 className="card-heading">鼠标控制</h3>
+            <h3 className="card-heading status-heading"><span>鼠标控制</span><span role="status" className={`heading-state ${status.bluetooth === 'connected' ? 'is-live' : ''}`}><i />{btLabels[status.bluetooth]}</span></h3>
             <div className="card-body">
-              <div className={`state-line ${status.bluetooth === 'connected' ? 'is-live' : ''}`}><Bluetooth size={20} /><i />{btLabels[status.bluetooth]}</div>
               <button className="secondary-button" disabled={busy || status.bluetooth === 'starting'} onClick={() => run(() => command(status.bluetooth === 'advertising' || status.bluetooth === 'connected' ? 'stop_bluetooth' : 'start_bluetooth'))}><Monitor size={15} />{status.bluetooth === 'advertising' || status.bluetooth === 'connected' ? '关闭鼠标控制' : '开启鼠标控制'}</button>
               {status.bluetooth !== 'connected' && status.bluetooth !== 'off' && <p className="status-message" role="status">{status.bluetoothMessage}</p>}
             </div>
           </section>
           <section className="inspector-card">
-            <h3 className="card-heading">声音</h3>
+            <h3 className="card-heading status-heading"><span>音量控制</span><span role="status" className={`heading-state ${!status.muted && status.audio ? 'is-live' : ''}`}><i />{status.muted ? '已静音' : status.audio || '待连接'}</span></h3>
             <div className="card-body">
-              <div className="info-row audio-state"><span>播放状态</span><strong>{status.muted ? '已静音' : status.audio || '待连接'}</strong></div>
               <div className="audio-control"><button className="icon-button" title={status.muted ? '取消静音' : '静音'} onClick={() => run(() => command('set_audio', { volume: status.volume, muted: !status.muted }))}>{status.muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={status.volume} onChange={e => { const volume = Number(e.target.value); setStatus(s => ({ ...s, volume })); command('set_audio', { volume, muted: status.muted }).catch(e => setError(String(e))); }} /><span>{Math.round(status.volume * 100)}%</span></div>
             </div>
           </section>

@@ -45,6 +45,7 @@ pub struct CastStatus {
     bluetooth_message: String,
     media_ready: bool,
     media_playback: String,
+    media_volume: Option<f64>,
     receiver_name: String,
     received_fps: f64,
     presented_fps: f64,
@@ -67,6 +68,7 @@ impl Default for CastStatus {
             bluetooth_message: "蓝牙控制尚未开启".into(),
             media_ready: false,
             media_playback: "unknown".into(),
+            media_volume: None,
             receiver_name: "澄镜 iPhone Cast".into(),
             received_fps: 0.0,
             presented_fps: 0.0,
@@ -103,6 +105,8 @@ pub struct AppState {
     restore: Mutex<Option<RestoreWindow>>,
     session: AtomicU64,
     media_generation: AtomicU64,
+    volume_request: AtomicU64,
+    volume_control: Mutex<()>,
 }
 impl Default for AppState {
     fn default() -> Self {
@@ -115,6 +119,8 @@ impl Default for AppState {
             restore: Mutex::new(None),
             session: AtomicU64::new(0),
             media_generation: AtomicU64::new(0),
+            volume_request: AtomicU64::new(0),
+            volume_control: Mutex::new(()),
         }
     }
 }
@@ -730,6 +736,7 @@ fn main() {
             speaker::connect_speaker,
             speaker::disconnect_speaker,
             speaker::send_media_control,
+            speaker::set_phone_volume,
             start_receiver,
             stop_receiver,
             start_bluetooth,

@@ -84,6 +84,7 @@ pub async fn connect_speaker(app: AppHandle, device_id: String) -> Result<Speake
     tauri::async_runtime::spawn_blocking(move || {
         let _apartment = Apartment::new().map_err(|e| e.to_string())?;
         let state = app.state::<crate::AppState>();
+        state.volume_request.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut speaker = state.speaker.lock().unwrap();
         speaker.disconnect();
         let result = (|| -> Result<(), String> {
@@ -114,6 +115,7 @@ pub async fn disconnect_speaker(app: AppHandle) -> Result<SpeakerStatus, String>
     tauri::async_runtime::spawn_blocking(move || {
         let _apartment = Apartment::new().map_err(|e| e.to_string())?;
         let state = app.state::<crate::AppState>();
+        state.volume_request.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut speaker = state.speaker.lock().unwrap();
         speaker.disconnect();
         Ok(speaker.status())
@@ -130,7 +132,9 @@ pub async fn send_media_control(app: AppHandle, action: String) -> Result<(), St
         "pause" => 0x00b1,
         "toggle" => 0x00cd,
         "next" => 0x00b5,
-        _ => return Err("不支持的播放操作".into()),
+        "volume_down" => 0x00ea,
+        "volume_up" => 0x00e9,
+        _ => return Err("不支持的媒体操作".into()),
     };
     tauri::async_runtime::spawn_blocking(move || {
         let _apartment = Apartment::new().map_err(|e| e.to_string())?;
@@ -138,12 +142,63 @@ pub async fn send_media_control(app: AppHandle, action: String) -> Result<(), St
         if state.speaker.lock().unwrap().status().state != "connected" {
             return Err("请先连接手机音频".into());
         }
-        let (tx, rx) = std::sync::mpsc::channel();
-        {
-            let service = state.bluetooth.lock().unwrap();
-            let service = service.as_ref().ok_or("请先开启并配对蓝牙媒体控制")?;
-            service.tx.send(crate::bluetooth::Control::Media(usage, tx)).map_err(|_| "蓝牙控制服务已停止")?;
+        send_usage(&app, usage)
+    }).await.map_err(|e| e.to_string())?
+}
+
+
+fn send_usage(app: &AppHandle, usage: u16) -> Result<(), String> {
+    let state = app.state::<crate::AppState>();
+    let (tx, rx) = std::sync::mpsc::channel();
+    {
+        let service = state.bluetooth.lock().unwrap();
+        let service = service.as_ref().ok_or("请先开启并配对蓝牙媒体控制")?;
+        service.tx.send(crate::bluetooth::Control::Media(usage, tx)).map_err(|_| "蓝牙控制服务已停止")?;
+    }
+    rx.recv_timeout(std::time::Duration::from_secs(5)).map_err(|_| "媒体按键发送超时，请检查蓝牙连接".to_string())?
+}
+
+/// The phone exposes incremental volume keys, so converge on a slider target
+/// using actual AMS feedback. Never assume a fixed iOS step size.
+#[tauri::command]
+pub async fn set_phone_volume(app: AppHandle, volume: f64) -> Result<Option<f64>, String> {
+    use std::{sync::atomic::Ordering, time::{Duration, Instant}};
+    if !volume.is_finite() || !(0.0..=1.0).contains(&volume) { return Err("无效的手机音量".into()); }
+    let request = app.state::<crate::AppState>().volume_request.fetch_add(1, Ordering::SeqCst) + 1;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _apartment = Apartment::new().map_err(|e| e.to_string())?;
+        let state = app.state::<crate::AppState>();
+        let _control = state.volume_control.lock().unwrap();
+        let generation = state.media_generation.load(Ordering::SeqCst);
+        let started = Instant::now();
+        let current_volume = || -> Result<f64, String> {
+            if state.media_generation.load(Ordering::SeqCst) != generation {
+                return Err("手机媒体连接已变化，请重新调节".into());
+            }
+            if state.speaker.lock().unwrap().status().state != "connected" { return Err("手机音频已断开".into()); }
+            let status = state.status.lock().unwrap();
+            if !status.media_ready { return Err("手机媒体控制已断开".into()); }
+            status.media_volume.ok_or_else(|| "手机尚未回传音量，暂时无法使用滑杆".into())
+        };
+        for _ in 0..32 {
+            if state.volume_request.load(Ordering::SeqCst) != request { return Ok(None); }
+            let before = current_volume()?;
+            if (before - volume).abs() <= 0.01 { return Ok(Some(before)); }
+            if started.elapsed() > Duration::from_secs(8) { return Err("手机音量调节超时".into()); }
+            send_usage(&app, if volume > before { 0x00e9 } else { 0x00ea })?;
+            let feedback = Instant::now();
+            let after = loop {
+                if state.volume_request.load(Ordering::SeqCst) != request { return Ok(None); }
+                let value = current_volume()?;
+                if (value - before).abs() > 0.0001 { break value; }
+                if feedback.elapsed() > Duration::from_secs(1) { return Err("未收到手机音量变化，请检查手机媒体连接".into()); }
+                std::thread::sleep(Duration::from_millis(40));
+            };
+            let step = (after - before).abs();
+            // Snap to a realizable phone volume, including nonstandard step sizes.
+            if (after - volume).abs() <= step / 2.0 + 0.001 { return Ok(Some(after)); }
+            if (volume - before).signum() != (volume - after).signum() { return Ok(Some(after)); }
         }
-        rx.recv_timeout(std::time::Duration::from_secs(5)).map_err(|_| "媒体按键发送超时，请检查蓝牙连接".to_string())?
+        Err("手机音量无法到达指定位置".into())
     }).await.map_err(|e| e.to_string())?
 }
