@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bluetooth, Play, Pause, RefreshCw, SkipBack, SkipForward, Smartphone, Volume2, VolumeX, X } from 'lucide-react';
+import { Bluetooth, Play, Pause, RefreshCw, SkipBack, SkipForward, Volume2, VolumeX, X } from 'lucide-react';
 import { CastStatus, command, desktop, initialSpeakerStatus, SpeakerDevice, SpeakerStatus } from './bridge';
 
 const labels = { off: '未连接', connected: '已连接', disconnected: '已断开', error: '连接异常' };
@@ -92,7 +92,7 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
           <div className="card-heading speaker-heading"><h3>手机设备</h3><button className="refresh-button" disabled={!desktop || busy || volumeBusy} onClick={() => run(refresh)}><RefreshCw size={14} />刷新</button></div>
           <div className="card-body device-list">
             {devices.length === 0 && <p className="status-message">未发现手机，请先在 Windows 蓝牙设置中配对，然后刷新。</p>}
-            {devices.map(device => <div className="speaker-device" key={device.id}><Smartphone size={23} /><div><strong>{device.name || '蓝牙设备'}</strong><small>{connected && status.deviceId === device.id ? '已连接' : '已配对'}</small></div><button className="secondary-button" disabled={busy || volumeBusy || !desktop} onClick={() => connected && status.deviceId === device.id ? run(async () => setStatus(await command<SpeakerStatus>('disconnect_speaker'))) : connect(device)}>{connected && status.deviceId === device.id ? '断开' : '连接'}</button></div>)}
+            {devices.map(device => <div className="speaker-device" key={device.id}><div><strong>{device.name || '蓝牙设备'}</strong></div><button className="secondary-button" disabled={busy || volumeBusy || !desktop} onClick={() => connected && status.deviceId === device.id ? run(async () => setStatus(await command<SpeakerStatus>('disconnect_speaker'))) : connect(device)}>{connected && status.deviceId === device.id ? '断开' : '连接'}</button></div>)}
           </div>
         </section>
         <section className="inspector-card"><h3 className="card-heading">连接状态</h3><div className="card-body metrics">
