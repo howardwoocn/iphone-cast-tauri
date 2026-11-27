@@ -148,6 +148,11 @@ pub async fn send_media_control(app: AppHandle, action: String) -> Result<(), St
         if state.speaker.lock().unwrap().status().state != "connected" {
             return Err("请先连接手机音频".into());
         }
+        // A direct volume key supersedes slider convergence and the connection probe.
+        let _volume_control = if action == "volume_up" || action == "volume_down" {
+            state.volume_request.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Some(state.volume_control.lock().unwrap())
+        } else { None };
         send_usage(&app, usage)
     }).await.map_err(|e| e.to_string())?
 }

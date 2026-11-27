@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bluetooth, Play, Pause, RefreshCw, SkipBack, SkipForward, Volume2, VolumeX, X } from 'lucide-react';
 import { CastStatus, command, desktop, initialSpeakerStatus, SpeakerDevice, SpeakerStatus } from './bridge';
 import VolumeSlider from './VolumeSlider';
+import { VolumeDownIcon, VolumeUpIcon } from './VolumeIcons';
 
 const labels = { off: '未连接', connected: '已连接', disconnected: '已断开', error: '连接异常' };
 export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy: (busy: boolean) => void }) {
@@ -99,6 +100,9 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
   });
   const control = async (action: string) => {
     if (mediaPending.current || !connected || !cast.mediaReady) return;
+    if (action === 'volume_up' || action === 'volume_down') {
+      clearTimeout(volumeTimer.current); volumeSequence.current++; setVolumeDraft(null);
+    }
     mediaPending.current = true;
     setError('');
     let request = 0;
@@ -134,7 +138,7 @@ export default function SpeakerView({ cast, onBusy }: { cast: CastStatus; onBusy
         <div className="speaker-stage">
           <div className="speaker-content">
             <div className="playback-controls" aria-label="手机播放控制">
-              {([{ action: 'previous', label: '上一首', Icon: SkipBack }, { action: 'toggle', label: toggleLabel, Icon: playing ? Pause : Play }, { action: 'next', label: '下一首', Icon: SkipForward }]).map(({ action, label, Icon }) => <button key={action} aria-label={label} title={label} className={`media-button ${action === 'toggle' ? 'media-toggle' : ''}`} disabled={!desktop || !connected || !cast.mediaReady || busy} onClick={() => control(action)}><span className="media-glyph"><Icon size={27} strokeWidth={1.5} /></span></button>)}
+              {([{ action: 'previous', label: '上一首', Icon: SkipBack }, { action: 'toggle', label: toggleLabel, Icon: playing ? Pause : Play }, { action: 'next', label: '下一首', Icon: SkipForward }, { action: 'volume_up', label: '音量加', Icon: VolumeUpIcon }, { action: 'volume_down', label: '音量减', Icon: VolumeDownIcon }]).map(({ action, label, Icon }) => <button key={action} aria-label={label} title={label} className={`media-button ${action === 'toggle' ? 'media-toggle' : `media-${action}`}`} disabled={!desktop || !connected || !cast.mediaReady || busy} onClick={() => control(action)}><span className="media-glyph"><Icon size={27} strokeWidth={1.5} /></span></button>)}
             </div>
             <h2>{status.deviceName || '等待手机连接'}</h2>
             <div className={`state-line ${connected ? 'is-live' : ''}`}><i />{connected ? '已连接' : status.state === 'disconnected' ? '已断开' : '未连接'}</div>
